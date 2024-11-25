@@ -1,5 +1,6 @@
 package com.employee.micro.services.impl;
 
+import com.employee.micro.feignclient.AddressFeignClient;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -23,48 +24,25 @@ public class EmployeeImpl implements EmployeeService{
 	@Autowired
 	private ModelMapper modelMapper;
 
-//	@Autowired
-	private final RestTemplate restTemplate; //RestTemplate no longer needs @Autowired since it is added in constructor
-
-//	@Value("${address.service.base.url}") //moved to EmployeeImpl constructor
-//	private String addressServiceBaseUrl;
+	@Value("${address.service.base.url}") //can be moved to EmployeeImpl constructor
+	private String addressServiceBaseUrl;
 
 	@Autowired
-	private WebClient webClient;
-
-	public EmployeeImpl(@Value("${address.service.base.url}") String addressServiceBaseUrl, RestTemplateBuilder restTemplateBuilder) {
-		this.restTemplate = restTemplateBuilder
-				.rootUri(addressServiceBaseUrl)
-				.build();
-	}
+	AddressFeignClient addressFeignClient;
 
 	@Override
 	public EmployeeView getEmployeeDetails(Integer id) throws Exception {
 		Employee employee = employeeRepo.findById(id).orElseThrow(()-> new Exception("Unable to fetch Employee"));
-		return new EmployeeView(employee, fetchAddressWithWebClientForEmployee(id));
+		return new EmployeeView(employee, addressFeignClient.getAddressByEmployeeId(id));
 	}
 	
 	@Override
 	public EmployeeView getEmployeeDetailsModelMapper(Integer id) throws Exception {
 		Employee employee = employeeRepo.findById(id).orElseThrow(()-> new Exception("Unable to fetch Employee"));
 		EmployeeView employeeView = modelMapper.map(employee, EmployeeView.class);
-		employeeView.setAddress(fetchAddressWithWebClientForEmployee(id));
+
+		employeeView.setAddress(addressFeignClient.getAddressByEmployeeId(id));
 		return employeeView;
-	}
-
-	@Override
-	public AddressView fetchAddressWithRestTemplateForEmployee(Integer id) throws Exception {
-		return restTemplate.getForObject("/address/{id}", AddressView.class, id);
-	}
-
-	@Override
-	public AddressView fetchAddressWithWebClientForEmployee(Integer id) throws Exception {
-		return webClient
-				.get()
-				.uri("/address/{id}",id)
-				.retrieve()
-				.bodyToMono(AddressView.class)
-				.block();
 	}
 
 }
